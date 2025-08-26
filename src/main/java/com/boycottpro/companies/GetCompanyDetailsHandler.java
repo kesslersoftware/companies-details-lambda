@@ -7,6 +7,7 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent
 
 import com.boycottpro.models.Companies;
 import com.boycottpro.utilities.CompanyUtility;
+import com.boycottpro.utilities.JwtUtility;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
@@ -32,29 +33,29 @@ public class GetCompanyDetailsHandler implements RequestHandler<APIGatewayProxyR
     @Override
     public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent event, Context context) {
         try {
+            String sub = JwtUtility.getSubFromRestEvent(event);
+            if (sub == null) return response(401, "Unauthorized");
             Map<String, String> pathParams = event.getPathParameters();
             String companyId = (pathParams != null) ? pathParams.get("company_id") : null;
             if (companyId == null || companyId.isEmpty()) {
-                return new APIGatewayProxyResponseEvent()
-                        .withStatusCode(400)
-                        .withBody("{\"error\":\"Missing company_id in path\"}");
+                return response(400,"error : Missing company_id in path");
             }
             Companies company = getCompanyById(companyId);
             if (company == null) {
-                return new APIGatewayProxyResponseEvent()
-                        .withStatusCode(500)
-                        .withBody("{\"error\": \"no company found!\"}");
+                return response(500,"error : no company found!");
             }
             String responseBody = objectMapper.writeValueAsString(company);
-            return new APIGatewayProxyResponseEvent()
-                    .withStatusCode(200)
-                    .withHeaders(Map.of("Content-Type", "application/json"))
-                    .withBody(responseBody);
+            return response(200,responseBody);
         } catch (Exception e) {
-            return new APIGatewayProxyResponseEvent()
-                    .withStatusCode(500)
-                    .withBody("{\"error\": \"Unexpected server error: " + e.getMessage() + "\"}");
+            return response(500,"error : Unexpected server error: " +
+                    e.getMessage());
         }
+    }
+    private APIGatewayProxyResponseEvent response(int status, String body) {
+        return new APIGatewayProxyResponseEvent()
+                .withStatusCode(status)
+                .withHeaders(Map.of("Content-Type", "application/json"))
+                .withBody(body);
     }
     private Companies getCompanyById(String companyId) {
         GetItemRequest request = GetItemRequest.builder()

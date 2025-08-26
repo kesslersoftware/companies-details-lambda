@@ -13,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.*;
 
+import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -34,7 +35,17 @@ public class GetCompanyDetailsHandlerTest {
     public void testValidCompanyIdReturnsCompany() throws Exception {
         String companyId = "c1";
         Map<String, String> pathParams = Map.of("company_id", companyId); // note: still using "user_id" key as in handler
-        APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent().withPathParameters(pathParams);
+        APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent();
+        Map<String, String> claims = Map.of("sub", "11111111-2222-3333-4444-555555555555");
+        Map<String, Object> authorizer = new HashMap<>();
+        authorizer.put("claims", claims);
+
+        APIGatewayProxyRequestEvent.ProxyRequestContext rc = new APIGatewayProxyRequestEvent.ProxyRequestContext();
+        rc.setAuthorizer(authorizer);
+        event.setRequestContext(rc);
+
+        // Path param "s" since client calls /users/s
+        event.setPathParameters(pathParams);
 
         Map<String, AttributeValue> item = Map.ofEntries(
                 Map.entry("company_id", AttributeValue.fromS("c1")),
@@ -65,8 +76,17 @@ public class GetCompanyDetailsHandlerTest {
 
     @Test
     public void testMissingCompanyIdReturns400() {
-        APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent()
-                .withPathParameters(Map.of("company_id", ""));
+        APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent();
+        Map<String, String> claims = Map.of("sub", "11111111-2222-3333-4444-555555555555");
+        Map<String, Object> authorizer = new HashMap<>();
+        authorizer.put("claims", claims);
+
+        APIGatewayProxyRequestEvent.ProxyRequestContext rc = new APIGatewayProxyRequestEvent.ProxyRequestContext();
+        rc.setAuthorizer(authorizer);
+        event.setRequestContext(rc);
+
+        // Path param "s" since client calls /users/s
+        event.setPathParameters(Map.of("company_id", ""));
 
         APIGatewayProxyResponseEvent response = handler.handleRequest(event, context);
 
@@ -78,8 +98,17 @@ public class GetCompanyDetailsHandlerTest {
     public void testCompanyNotFoundReturnsError() {
         String companyId = "unknown";
         Map<String, String> pathParams = Map.of("company_id", companyId);
-        APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent().withPathParameters(pathParams);
+        APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent();
+        Map<String, String> claims = Map.of("sub", "11111111-2222-3333-4444-555555555555");
+        Map<String, Object> authorizer = new HashMap<>();
+        authorizer.put("claims", claims);
 
+        APIGatewayProxyRequestEvent.ProxyRequestContext rc = new APIGatewayProxyRequestEvent.ProxyRequestContext();
+        rc.setAuthorizer(authorizer);
+        event.setRequestContext(rc);
+
+        // Path param "s" since client calls /users/s
+        event.setPathParameters(pathParams);
         when(dynamoDb.getItem(any(GetItemRequest.class)))
                 .thenReturn(GetItemResponse.builder().build());
 
@@ -93,8 +122,17 @@ public class GetCompanyDetailsHandlerTest {
     public void testUnexpectedExceptionReturns500() {
         String companyId = "crash";
         Map<String, String> pathParams = Map.of("company_id", companyId);
-        APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent().withPathParameters(pathParams);
+        APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent();
+        Map<String, String> claims = Map.of("sub", "11111111-2222-3333-4444-555555555555");
+        Map<String, Object> authorizer = new HashMap<>();
+        authorizer.put("claims", claims);
 
+        APIGatewayProxyRequestEvent.ProxyRequestContext rc = new APIGatewayProxyRequestEvent.ProxyRequestContext();
+        rc.setAuthorizer(authorizer);
+        event.setRequestContext(rc);
+
+        // Path param "s" since client calls /users/s
+        event.setPathParameters(pathParams);
         when(dynamoDb.getItem(any(GetItemRequest.class)))
                 .thenThrow(new RuntimeException("Boom"));
 
