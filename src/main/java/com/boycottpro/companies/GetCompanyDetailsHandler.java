@@ -32,30 +32,36 @@ public class GetCompanyDetailsHandler implements RequestHandler<APIGatewayProxyR
 
     @Override
     public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent event, Context context) {
+        String sub = null;
         try {
-            String sub = JwtUtility.getSubFromRestEvent(event);
-            if (sub == null) return response(401, "Unauthorized");
+            sub = JwtUtility.getSubFromRestEvent(event);
+            if (sub == null) return response(401, Map.of("message", "Unauthorized"));
             Map<String, String> pathParams = event.getPathParameters();
             String companyId = (pathParams != null) ? pathParams.get("company_id") : null;
             if (companyId == null || companyId.isEmpty()) {
-                return response(400,"error : Missing company_id in path");
+                return response(400,Map.of("error", "Missing company_id in path"));
             }
             Companies company = getCompanyById(companyId);
             if (company == null) {
-                return response(500,"error : no company found!");
+                return response(404,Map.of("error", "no company found!"));
             }
-            String responseBody = objectMapper.writeValueAsString(company);
-            return response(200,responseBody);
+            return response(200,company);
         } catch (Exception e) {
-            return response(500,"error : Unexpected server error: " +
-                    e.getMessage());
+            System.out.println(e.getMessage() + " for user " + sub);
+            return response(500,Map.of("error", "Unexpected server error: " + e.getMessage()) );
         }
     }
-    private APIGatewayProxyResponseEvent response(int status, String body) {
+    private APIGatewayProxyResponseEvent response(int status, Object body) {
+        String responseBody = null;
+        try {
+            responseBody = objectMapper.writeValueAsString(body);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
         return new APIGatewayProxyResponseEvent()
                 .withStatusCode(status)
                 .withHeaders(Map.of("Content-Type", "application/json"))
-                .withBody(body);
+                .withBody(responseBody);
     }
     private Companies getCompanyById(String companyId) {
         GetItemRequest request = GetItemRequest.builder()

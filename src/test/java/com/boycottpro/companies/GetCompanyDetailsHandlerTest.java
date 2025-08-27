@@ -114,7 +114,7 @@ public class GetCompanyDetailsHandlerTest {
 
         APIGatewayProxyResponseEvent response = handler.handleRequest(event, context);
 
-        assertEquals(500, response.getStatusCode());
+        assertEquals(404, response.getStatusCode());
         assertTrue(response.getBody().contains("no company found"));
     }
 
