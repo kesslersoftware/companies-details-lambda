@@ -3,18 +3,21 @@ package com.boycottpro.companies;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
-import com.boycottpro.models.Companies;
-import com.boycottpro.utilities.CompanyUtility;
+import com.boycottpro.companies.config.AppConfig;
+import com.boycottpro.companies.model.CompanyData;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.services.dynamodb.model.*;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.*;
+import software.amazon.awssdk.core.ResponseInputStream;
+import java.io.ByteArrayInputStream;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -22,19 +25,34 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 public class GetCompanyDetailsHandlerTest {
 
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        Properties testProperties = new Properties();
+        testProperties.setProperty("s3.bucket.name", "test-companies-bucket");
+        testProperties.setProperty("app.name", "test-app");
+        testProperties.setProperty("app.version", "1.0-TEST");
+        testProperties.setProperty("app.environment", "test");
+        testProperties.setProperty("app.log.level", "DEBUG");
+        testProperties.setProperty("app.cache.enabled", "false");
+        testProperties.setProperty("app.metrics.enabled", "false");
+        
+        testAppConfig = new AppConfig(testProperties, "test");
+        handler = new GetCompanyDetailsHandler(s3Client, testAppConfig);
+    }
+
     @Mock
-    private DynamoDbClient dynamoDb;
+    private S3Client s3Client;
 
     @Mock
     private Context context;
 
-    @InjectMocks
     private GetCompanyDetailsHandler handler;
+    private AppConfig testAppConfig;
 
     @Test
-    public void testValidCompanyIdReturnsCompany() throws Exception {
-        String companyId = "c1";
-        Map<String, String> pathParams = Map.of("company_id", companyId); // note: still using "user_id" key as in handler
+    public void testValidCompanyNameReturnsCompany() throws Exception {
+        String companyName = "Apple";
+        Map<String, String> pathParams = Map.of("company_name", companyName);
         APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent();
         Map<String, String> claims = Map.of("sub", "11111111-2222-3333-4444-555555555555");
         Map<String, Object> authorizer = new HashMap<>();
@@ -44,38 +62,44 @@ public class GetCompanyDetailsHandlerTest {
         rc.setAuthorizer(authorizer);
         event.setRequestContext(rc);
 
-        // Path param "s" since client calls /users/s
         event.setPathParameters(pathParams);
 
-        Map<String, AttributeValue> item = Map.ofEntries(
-                Map.entry("company_id", AttributeValue.fromS("c1")),
-                Map.entry("company_name", AttributeValue.fromS("Apple")),
-                Map.entry("description", AttributeValue.fromS("computer company")),
-                Map.entry("industry", AttributeValue.fromS("software")),
-                Map.entry("city", AttributeValue.fromS("New York")),
-                Map.entry("state", AttributeValue.fromS("NY")),
-                Map.entry("zip", AttributeValue.fromS("11111")),
-                Map.entry("employees", AttributeValue.fromN("2222")),
-                Map.entry("revenue", AttributeValue.fromN("33333333")),
-                Map.entry("valuation", AttributeValue.fromN("4444444444")),
-                Map.entry("profits", AttributeValue.fromN("5555")),
-                Map.entry("stock_symbol", AttributeValue.fromS("APL")),
-                Map.entry("ceo", AttributeValue.fromS("fred")),
-                Map.entry("boycott_count", AttributeValue.fromN("10"))
+        String jsonContent = "{" +
+                "\"company\":\"Apple Inc.\"," +
+                "\"slug\":\"apple\"," +
+                "\"as_of_utc\":\"2024-01-01T00:00:00Z\"," +
+                "\"summary\":\"Technology company that designs and manufactures consumer electronics\"," +
+                "\"sector\":\"Technology\"," +
+                "\"hq_city\":\"Cupertino\"," +
+                "\"founded_year\":1976," +
+                "\"employees_est\":164000," +
+                "\"key_products\":[\"iPhone\",\"iPad\",\"Mac\"]," +
+                "\"stock_ticker\":\"AAPL\"," +
+                "\"website\":\"https://www.apple.com\"," +
+                "\"notable_news_window\":\"Past 6 months\"," +
+                "\"controversies_or_issues\":[{\"title\":\"Privacy concerns\",\"desc\":\"Data collection practices\",\"date\":\"2023-12-01\",\"source_url\":\"https://example.com\"}]," +
+                "\"sources\":[{\"title\":\"Company website\",\"url\":\"https://www.apple.com\"}]" +
+                "}";
+        
+        ByteArrayInputStream inputStream = new ByteArrayInputStream(jsonContent.getBytes());
+        ResponseInputStream<GetObjectResponse> responseInputStream = new ResponseInputStream<>(
+            GetObjectResponse.builder().build(),
+            inputStream
         );
 
-        when(dynamoDb.getItem(any(GetItemRequest.class)))
-                .thenReturn(GetItemResponse.builder().item(item).build());
+        when(s3Client.getObject(any(GetObjectRequest.class)))
+                .thenReturn(responseInputStream);
 
         APIGatewayProxyResponseEvent response = handler.handleRequest(event, context);
 
         assertEquals(200, response.getStatusCode());
-        assertTrue(response.getBody().contains("Apple"));
-        assertTrue(response.getBody().contains("c1"));
+        assertTrue(response.getBody().contains("Apple Inc."));
+        assertTrue(response.getBody().contains("Technology"));
+        assertTrue(response.getBody().contains("Cupertino"));
     }
 
     @Test
-    public void testMissingCompanyIdReturns400() {
+    public void testMissingCompanyNameReturns400() {
         APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent();
         Map<String, String> claims = Map.of("sub", "11111111-2222-3333-4444-555555555555");
         Map<String, Object> authorizer = new HashMap<>();
@@ -85,19 +109,18 @@ public class GetCompanyDetailsHandlerTest {
         rc.setAuthorizer(authorizer);
         event.setRequestContext(rc);
 
-        // Path param "s" since client calls /users/s
-        event.setPathParameters(Map.of("company_id", ""));
+        event.setPathParameters(Map.of("company_name", ""));
 
         APIGatewayProxyResponseEvent response = handler.handleRequest(event, context);
 
         assertEquals(400, response.getStatusCode());
-        assertTrue(response.getBody().contains("Missing company_id"));
+        assertTrue(response.getBody().contains("Missing company_name"));
     }
 
     @Test
     public void testCompanyNotFoundReturnsError() {
-        String companyId = "unknown";
-        Map<String, String> pathParams = Map.of("company_id", companyId);
+        String companyName = "Unknown Company";
+        Map<String, String> pathParams = Map.of("company_name", companyName);
         APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent();
         Map<String, String> claims = Map.of("sub", "11111111-2222-3333-4444-555555555555");
         Map<String, Object> authorizer = new HashMap<>();
@@ -107,10 +130,9 @@ public class GetCompanyDetailsHandlerTest {
         rc.setAuthorizer(authorizer);
         event.setRequestContext(rc);
 
-        // Path param "s" since client calls /users/s
         event.setPathParameters(pathParams);
-        when(dynamoDb.getItem(any(GetItemRequest.class)))
-                .thenReturn(GetItemResponse.builder().build());
+        when(s3Client.getObject(any(GetObjectRequest.class)))
+                .thenThrow(NoSuchKeyException.builder().build());
 
         APIGatewayProxyResponseEvent response = handler.handleRequest(event, context);
 
@@ -120,8 +142,8 @@ public class GetCompanyDetailsHandlerTest {
 
     @Test
     public void testUnexpectedExceptionReturns500() {
-        String companyId = "crash";
-        Map<String, String> pathParams = Map.of("company_id", companyId);
+        String companyName = "Test Company";
+        Map<String, String> pathParams = Map.of("company_name", companyName);
         APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent();
         Map<String, String> claims = Map.of("sub", "11111111-2222-3333-4444-555555555555");
         Map<String, Object> authorizer = new HashMap<>();
@@ -131,14 +153,23 @@ public class GetCompanyDetailsHandlerTest {
         rc.setAuthorizer(authorizer);
         event.setRequestContext(rc);
 
-        // Path param "s" since client calls /users/s
         event.setPathParameters(pathParams);
-        when(dynamoDb.getItem(any(GetItemRequest.class)))
+        when(s3Client.getObject(any(GetObjectRequest.class)))
                 .thenThrow(new RuntimeException("Boom"));
 
         APIGatewayProxyResponseEvent response = handler.handleRequest(event, context);
 
         assertEquals(500, response.getStatusCode());
         assertTrue(response.getBody().contains("Unexpected server error"));
+    }
+    
+    @Test
+    public void testConfigurationProfileLoading() {
+        assertEquals("test", testAppConfig.getActiveProfile());
+        assertEquals("test", testAppConfig.getEnvironment());
+        assertEquals("test-companies-bucket", testAppConfig.getS3BucketName());
+        assertEquals("DEBUG", testAppConfig.getLogLevel());
+        assertFalse(testAppConfig.isCacheEnabled());
+        assertFalse(testAppConfig.isMetricsEnabled());
     }
 }

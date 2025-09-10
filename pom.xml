@@ -10,6 +10,7 @@
     <maven.compiler.source>17</maven.compiler.source>
     <maven.compiler.target>17</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <aws.sdk.v2.version>2.25.66</aws.sdk.v2.version>
   </properties>
   <dependencies>
     <!-- AWS Lambda -->
@@ -20,8 +21,8 @@
     </dependency>
     <dependency>
       <groupId>software.amazon.awssdk</groupId>
-      <artifactId>dynamodb</artifactId>
-      <version>2.31.52</version>
+      <artifactId>s3</artifactId>
+      <version>${aws.sdk.v2.version}</version>
     </dependency>
     <dependency>
       <groupId>com.amazonaws</groupId>
@@ -31,7 +32,12 @@
     <dependency>
       <groupId>software.amazon.awssdk</groupId>
       <artifactId>lambda</artifactId>
-      <version>2.31.52</version>
+      <version>${aws.sdk.v2.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>ssooidc</artifactId>
+      <version>${aws.sdk.v2.version}</version>
     </dependency>
     <!-- JSON support -->
     <dependency>

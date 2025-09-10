@@ -5,29 +5,37 @@ import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
 
-import com.boycottpro.models.Companies;
-import com.boycottpro.utilities.CompanyUtility;
 import com.boycottpro.utilities.JwtUtility;
+import com.boycottpro.companies.config.AppConfig;
+import com.boycottpro.companies.model.CompanyData;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.services.dynamodb.model.*;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.*;
+import software.amazon.awssdk.core.ResponseInputStream;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
 public class GetCompanyDetailsHandler implements RequestHandler<APIGatewayProxyRequestEvent, APIGatewayProxyResponseEvent> {
 
-    private static final String TABLE_NAME = "";
-    private final DynamoDbClient dynamoDb;
+    private final S3Client s3Client;
+    private final AppConfig appConfig;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public GetCompanyDetailsHandler() {
-        this.dynamoDb = DynamoDbClient.create();
+        this.s3Client = S3Client.create();
+        this.appConfig = AppConfig.getInstance();
     }
 
-    public GetCompanyDetailsHandler(DynamoDbClient dynamoDb) {
-        this.dynamoDb = dynamoDb;
+    public GetCompanyDetailsHandler(S3Client s3Client) {
+        this.s3Client = s3Client;
+        this.appConfig = AppConfig.getInstance();
+    }
+
+    public GetCompanyDetailsHandler(S3Client s3Client, AppConfig appConfig) {
+        this.s3Client = s3Client;
+        this.appConfig = appConfig;
     }
 
     @Override
@@ -36,18 +44,24 @@ public class GetCompanyDetailsHandler implements RequestHandler<APIGatewayProxyR
         try {
             sub = JwtUtility.getSubFromRestEvent(event);
             if (sub == null) return response(401, Map.of("message", "Unauthorized"));
+            
+            // Log environment info for debugging
+            System.out.println("Active profile: " + appConfig.getActiveProfile() + 
+                             ", Environment: " + appConfig.getEnvironment() + 
+                             ", S3 Bucket: " + appConfig.getS3BucketName());
+            
             Map<String, String> pathParams = event.getPathParameters();
-            String companyId = (pathParams != null) ? pathParams.get("company_id") : null;
-            if (companyId == null || companyId.isEmpty()) {
-                return response(400,Map.of("error", "Missing company_id in path"));
+            String companyName = (pathParams != null) ? pathParams.get("company_name") : null;
+            if (companyName == null || companyName.isEmpty()) {
+                return response(400,Map.of("error", "Missing company_name in path"));
             }
-            Companies company = getCompanyById(companyId);
+            CompanyData company = getCompanyByName(companyName);
             if (company == null) {
                 return response(404,Map.of("error", "no company found!"));
             }
             return response(200,company);
         } catch (Exception e) {
-            System.out.println(e.getMessage() + " for user " + sub);
+            System.out.println(e.getMessage() + " for user " + sub + " in environment " + appConfig.getEnvironment());
             return response(500,Map.of("error", "Unexpected server error: " + e.getMessage()) );
         }
     }
@@ -63,18 +77,24 @@ public class GetCompanyDetailsHandler implements RequestHandler<APIGatewayProxyR
                 .withHeaders(Map.of("Content-Type", "application/json"))
                 .withBody(responseBody);
     }
-    private Companies getCompanyById(String companyId) {
-        GetItemRequest request = GetItemRequest.builder()
-                .tableName("companies")
-                .key(Map.of("company_id", AttributeValue.fromS(companyId)))
-                .build();
+    private CompanyData getCompanyByName(String companyName) {
+        try {
+            String key = String.format("companies/%s.json", companyName.toLowerCase().replace(" ", "-"));
+            
+            GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                    .bucket(appConfig.getS3BucketName())
+                    .key(key)
+                    .build();
 
-        GetItemResponse response = dynamoDb.getItem(request);
-
-        if (response.hasItem()) {
-            return CompanyUtility.mapToCompany(response.item());
-        } else {
-            return null; // or throw an exception if preferred
+            ResponseInputStream<GetObjectResponse> s3Object = s3Client.getObject(getObjectRequest);
+            
+            String jsonContent = new String(s3Object.readAllBytes());
+            return objectMapper.readValue(jsonContent, CompanyData.class);
+            
+        } catch (NoSuchKeyException e) {
+            return null; // Company file not found
+        } catch (Exception e) {
+            throw new RuntimeException("Error reading company data from S3", e);
         }
     }
 }
