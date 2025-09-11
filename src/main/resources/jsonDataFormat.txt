@@ -1,0 +1,16 @@
+{
+  "company":"string",
+  "slug":"string",
+  "as_of_utc":"string",
+  "summary":"string",
+  "sector":"string",
+  "hq_city":"string",
+  "founded_year":0,
+  "employees_est":0,
+  "key_products":[],
+  "stock_ticker":"string",
+  "website":"string",
+  "notable_news_window":"string",
+  "controversies_or_issues":[{"title":"string","desc":"string","date":"string","source_url":"string"}],
+  "sources":[{"title":"string","url":"string"}]
+}

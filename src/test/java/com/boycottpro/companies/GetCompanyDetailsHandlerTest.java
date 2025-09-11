@@ -52,7 +52,7 @@ public class GetCompanyDetailsHandlerTest {
     @Test
     public void testValidCompanyNameReturnsCompany() throws Exception {
         String companyName = "Apple";
-        Map<String, String> pathParams = Map.of("company_name", companyName);
+        Map<String, String> pathParams = Map.of("company_id", companyName);
         APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent();
         Map<String, String> claims = Map.of("sub", "11111111-2222-3333-4444-555555555555");
         Map<String, Object> authorizer = new HashMap<>();
@@ -109,7 +109,7 @@ public class GetCompanyDetailsHandlerTest {
         rc.setAuthorizer(authorizer);
         event.setRequestContext(rc);
 
-        event.setPathParameters(Map.of("company_name", ""));
+        event.setPathParameters(Map.of("company_id", ""));
 
         APIGatewayProxyResponseEvent response = handler.handleRequest(event, context);
 
@@ -120,7 +120,7 @@ public class GetCompanyDetailsHandlerTest {
     @Test
     public void testCompanyNotFoundReturnsError() {
         String companyName = "Unknown Company";
-        Map<String, String> pathParams = Map.of("company_name", companyName);
+        Map<String, String> pathParams = Map.of("company_id", companyName);
         APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent();
         Map<String, String> claims = Map.of("sub", "11111111-2222-3333-4444-555555555555");
         Map<String, Object> authorizer = new HashMap<>();
@@ -143,7 +143,7 @@ public class GetCompanyDetailsHandlerTest {
     @Test
     public void testUnexpectedExceptionReturns500() {
         String companyName = "Test Company";
-        Map<String, String> pathParams = Map.of("company_name", companyName);
+        Map<String, String> pathParams = Map.of("company_id", companyName);
         APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent();
         Map<String, String> claims = Map.of("sub", "11111111-2222-3333-4444-555555555555");
         Map<String, Object> authorizer = new HashMap<>();

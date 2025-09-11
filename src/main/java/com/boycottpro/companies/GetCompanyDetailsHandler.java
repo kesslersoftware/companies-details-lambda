@@ -51,7 +51,7 @@ public class GetCompanyDetailsHandler implements RequestHandler<APIGatewayProxyR
                              ", S3 Bucket: " + appConfig.getS3BucketName());
             
             Map<String, String> pathParams = event.getPathParameters();
-            String companyName = (pathParams != null) ? pathParams.get("company_name") : null;
+            String companyName = (pathParams != null) ? pathParams.get("company_id") : null;
             if (companyName == null || companyName.isEmpty()) {
                 return response(400,Map.of("error", "Missing company_name in path"));
             }
@@ -79,8 +79,8 @@ public class GetCompanyDetailsHandler implements RequestHandler<APIGatewayProxyR
     }
     private CompanyData getCompanyByName(String companyName) {
         try {
-            String key = String.format("companies/%s.json", companyName.toLowerCase().replace(" ", "-"));
-            
+            String key = String.format("%s.json", companyName.replace(" ", "-"));
+            System.out.println("key = " + key);
             GetObjectRequest getObjectRequest = GetObjectRequest.builder()
                     .bucket(appConfig.getS3BucketName())
                     .key(key)
@@ -92,6 +92,7 @@ public class GetCompanyDetailsHandler implements RequestHandler<APIGatewayProxyR
             return objectMapper.readValue(jsonContent, CompanyData.class);
             
         } catch (NoSuchKeyException e) {
+            System.out.println("No such key: " + companyName);
             return null; // Company file not found
         } catch (Exception e) {
             throw new RuntimeException("Error reading company data from S3", e);
