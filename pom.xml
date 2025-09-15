@@ -10,7 +10,9 @@
     <maven.compiler.source>17</maven.compiler.source>
     <maven.compiler.target>17</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <aws.sdk.v2.version>2.25.66</aws.sdk.v2.version>
+    <aws.sdk.v2.version>2.25.66</aws.sdk.v2.version>    <jacoco.version>0.8.10</jacoco.version>
+    <sonar.organization>kesslersoftware</sonar.organization>
+    <sonar.host.url>http://localhost:9000</sonar.host.url>
   </properties>
   <dependencies>
     <!-- AWS Lambda -->
