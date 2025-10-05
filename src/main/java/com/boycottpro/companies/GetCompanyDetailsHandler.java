@@ -8,6 +8,7 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent
 import com.boycottpro.utilities.JwtUtility;
 import com.boycottpro.companies.config.AppConfig;
 import com.boycottpro.companies.model.CompanyData;
+import com.boycottpro.utilities.Logger;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -41,27 +42,30 @@ public class GetCompanyDetailsHandler implements RequestHandler<APIGatewayProxyR
     @Override
     public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent event, Context context) {
         String sub = null;
+        int lineNum = 45;
         try {
             sub = JwtUtility.getSubFromRestEvent(event);
-            if (sub == null) return response(401, Map.of("message", "Unauthorized"));
-            
-            // Log environment info for debugging
-            System.out.println("Active profile: " + appConfig.getActiveProfile() + 
-                             ", Environment: " + appConfig.getEnvironment() + 
-                             ", S3 Bucket: " + appConfig.getS3BucketName());
-            
+            if (sub == null) {
+            Logger.error(49, sub, "user is Unauthorized");
+            return response(401, Map.of("message", "Unauthorized"));
+            }
+            lineNum = 52;
             Map<String, String> pathParams = event.getPathParameters();
             String companyName = (pathParams != null) ? pathParams.get("company_id") : null;
             if (companyName == null || companyName.isEmpty()) {
+                Logger.error(56, sub, "user is Unauthorized");
                 return response(400,Map.of("error", "Missing company_name in path"));
             }
+            lineNum = 59;
             CompanyData company = getCompanyByName(companyName);
             if (company == null) {
+                Logger.error(62, sub, "user is Unauthorized");
                 return response(404,Map.of("error", "no company found!"));
             }
+            lineNum = 65;
             return response(200,company);
         } catch (Exception e) {
-            System.out.println(e.getMessage() + " for user " + sub + " in environment " + appConfig.getEnvironment());
+            Logger.error(lineNum, sub, e.getMessage());
             return response(500,Map.of("error", "Unexpected server error: " + e.getMessage()) );
         }
     }
